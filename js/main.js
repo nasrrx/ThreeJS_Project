@@ -1,8 +1,5 @@
 // js/main.js
-
-// Import Three.js core + OrbitControls from CDN
-import * as THREE from "https://unpkg.com/three@0.164.0/build/three.module.js";
-import { OrbitControls } from "https://unpkg.com/three@0.164.0/examples/jsm/controls/OrbitControls.js";
+// NOTE: No imports here. THREE is global from the script tags in index.html.
 
 /**********************************************************************
  * GLOBALS – CORE THREE OBJECTS
@@ -179,7 +176,7 @@ function init() {
   clickableObjects.push(energyCone);
 
   /*********** ORBIT CONTROLS ***********/
-  controls = new OrbitControls(camera, renderer.domElement);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.enablePan = true;
