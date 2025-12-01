@@ -34,7 +34,7 @@ The scene is designed around **three core physics concepts**:
 - The **floor texture** changes based on the gravity preset:
   - Earth gravity → Earth ground texture  
   - Jupiter gravity → Jupiter ground texture  
-  - Moon gravity → Mars texture used as a placeholder lunar surface  
+  - Moon gravity → Moon texture used as a placeholder lunar surface  
 
 This illustrates how **the same object behaves differently under different gravitational fields**.
 
@@ -161,7 +161,7 @@ This section describes the logical sequence that was followed to implement the p
    - On first activation, switch the cone to a `MeshPhysicalMaterial` (if available) with transparency, transmission, and clearcoat to approximate glass.
    - On second activation, restore the original solid material.
 3. Implement `setPlanetFloor(planet)`:
-   - Load textures `EarthTexture.png`, `JupiterTexture.jpg`, `MarsTexture.jpg`.
+   - Load textures `EarthTexture.png`, `JupiterTexture.jpg`, `MoonTexture.jpg`.
    - Wrap and repeat them to tile across the plane.
    - Update `plane.material.map` and `plane.material.color`.
    - Call `setPlanetFloor("earth")` in `init()` and also whenever gravity preset changes.
@@ -224,9 +224,9 @@ Typical structure:
 
 - Image file used as the **ground texture when gravity preset is Jupiter**.
 
-### `MarsTexture.jpg`
+### `MoonTexture.jpg`
 
-- Image file used as the **ground texture when gravity preset is Moon** (placeholder lunar surface) or directly via `setPlanetFloor("mars")` if extended later.
+- Image file used as the **ground texture when gravity preset is Moon** (placeholder lunar surface) or directly via `setPlanetFloor("Moon")` if extended later.
 
 ### `README.md`
 
@@ -260,7 +260,7 @@ project-root/
   main.js
   EarthTexture.png
   JupiterTexture.jpg
-  MarsTexture.jpg
+  MoonTexture.jpg
   README.md
 ```
 
@@ -319,7 +319,7 @@ Use any local static server (Node `http-server`, XAMPP, etc.) and point it to th
 
 - **Preset dropdown**: Earth / Moon / Jupiter
   - Changes `currentGravityPreset`.
-  - Changes the ground texture to match the selected body (Earth / Jupiter / Mars-as-Moon).
+  - Changes the ground texture to match the selected body (Earth / Jupiter / Moon-as-Moon).
 - **Simulate Gravity on Last Clicked**:
   - Applies gravity to the currently selected object.
   - Object falls, bounces, and then stops; its original animation resumes.
@@ -427,7 +427,7 @@ Use any local static server (Node `http-server`, XAMPP, etc.) and point it to th
    - Ground plane uses external textures:
      - `EarthTexture.png`
      - `JupiterTexture.jpg`
-     - `MarsTexture.jpg`
+     - `MoonTexture.jpg`
    - Loaded at runtime and tiled using `RepeatWrapping`.
 
 4. **Continuous Animation**  
