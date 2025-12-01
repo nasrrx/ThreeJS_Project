@@ -8,6 +8,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.117.1/build/three.m
 let scene, camera, renderer;
 let raycaster, mouse;
 let collisionRaycaster;
+let textureLoader;
+
 
 let plane;
 let bouncingSphere;
@@ -17,6 +19,7 @@ let wall;
 let energyCone;
 
 const clickableObjects = [];
+
 
 let clock;
 let timeElapsed = 0;
@@ -99,6 +102,7 @@ let clearProjectilesBtn;
 let coneOriginalMaterial = null;
 let coneIsGlass = false;
 
+
 /**********************************************************************
  * ENTRY POINT
  **********************************************************************/
@@ -109,6 +113,7 @@ animate();
  * INIT
  **********************************************************************/
 function init() {
+  textureLoader = new THREE.TextureLoader();
   clock = new THREE.Clock();
   timeElapsed = 0;
 
@@ -150,6 +155,9 @@ function init() {
   plane.receiveShadow = true;
   scene.add(plane);
 
+  setPlanetFloor("earth");
+
+
   /*********** COLORS ***********/
   const COLORS = {
     accentOrange: 0xffb347,
@@ -163,7 +171,7 @@ function init() {
   const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
   const sphereMaterial = new THREE.MeshStandardMaterial({ color: COLORS.accentBlue });
   bouncingSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-  bouncingSphere.position.set(0, 1.5, 0);
+  bouncingSphere.position.set(0, 1.5, 1);
   bouncingSphere.castShadow = true;
   scene.add(bouncingSphere);
   clickableObjects.push(bouncingSphere);
@@ -231,7 +239,53 @@ function init() {
 
   /*********** RESIZE ***********/
   window.addEventListener("resize", onWindowResize);
+
+
+
 }
+
+function setPlanetFloor(planet) {
+  if (!textureLoader || !plane) return;
+
+  let fileName;
+  switch (planet) {
+    case "earth":
+      fileName = "EarthTexture.png";
+      break;
+    case "jupiter":
+      fileName = "JupiterTexture.jpg";
+      break;
+    case "moon":
+      fileName = "MoonTexture.jpg";
+      break;
+    default:
+      fileName = null;
+  }
+
+  if (!fileName) {
+    // Remove texture, fallback to plain color
+    plane.material.map = null;
+    plane.material.color.set(0x333333);
+    plane.material.needsUpdate = true;
+    return;
+  }
+
+  textureLoader.load(
+    fileName,
+    function (tex) {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(2, 2); // tile it a bit
+      plane.material.map = tex;
+      plane.material.color.set(0xffffff); // so texture shows correctly
+      plane.material.needsUpdate = true;
+    },
+    undefined,
+    function (err) {
+      console.error("Failed to load planet texture:", fileName, err);
+    }
+  );
+}
+
 
 /**********************************************************************
  * UI CREATION
@@ -644,7 +698,22 @@ function onGravityButtonClick() {
 function onGravityPresetChange() {
   const preset = gravityPresetSelect.value; // "earth" | "moon" | "jupiter"
   currentGravityPreset = preset;
+
+  // Bind floor texture to gravity setting
+  if (preset === "earth") {
+    setPlanetFloor("earth");
+  } else if (preset === "jupiter") {
+    setPlanetFloor("jupiter");
+  } else if (preset === "moon") {
+    // You don't have a moon texture, pick one:
+    // Option 1: use Mars as a placeholder
+    setPlanetFloor("mars");
+
+    // Option 2 (if you prefer plain floor):
+    // setPlanetFloor(null);
+  }
 }
+
 
 /**********************************************************************
  * SPAWN FALLING SPHERE (simple vertical body)
@@ -817,10 +886,20 @@ function onWindowResize() {
 /**********************************************************************
  * MOVEMENT + COLLISION WITH OBJECTS
  **********************************************************************/
+
+function getApproxRadius(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  return size.length() * 0.5; // half of the diagonal as a rough radius
+}
+
+
 function updateLastClickedMovement(delta) {
   if (!lastClickedObject) return;
 
-  const dir = new THREE.Vector3(0, 0, 0);
+  // Build desired movement direction from WASD relative to camera
+  const dir = new THREE.Vector3();
+
   const camForward = new THREE.Vector3();
   camera.getWorldDirection(camForward);
   camForward.y = 0;
@@ -836,33 +915,39 @@ function updateLastClickedMovement(delta) {
   if (moveInput.left) dir.sub(camRight);
   if (moveInput.right) dir.add(camRight);
 
-  if (dir.lengthSq() === 0) return;
+  if (dir.lengthSq() === 0) return; // no input
 
   dir.normalize();
   const distance = moveSpeed * delta;
   const displacement = dir.clone().multiplyScalar(distance);
 
-  // Approximate object "radius" from its bounding box
-  const bbox = new THREE.Box3().setFromObject(lastClickedObject);
-  const size = bbox.getSize(new THREE.Vector3());
-  const objectRadius = size.length() * 0.5; // half diagonal
-  const extraMargin = 0.3; // makes collision feel "a bit bigger"
+  // Candidate new position
+  const newPos = lastClickedObject.position.clone().add(displacement);
 
-  const origin = lastClickedObject.position.clone();
-  collisionRaycaster.set(origin, dir);
-  const intersections = collisionRaycaster.intersectObject(wall, false);
+  // Approx radius of moving object
+  const myRadius = getApproxRadius(lastClickedObject) * 0.6; // scale a bit down
+  const margin = 0.15; // extra spacing so it feels solid but not too far
 
-  if (
-    intersections.length > 0 &&
-    intersections[0].distance < distance + objectRadius + extraMargin
-  ) {
-    // Too close to wall -> block movement
-    return;
+  // Check distance to all other clickable objects
+  for (let i = 0; i < clickableObjects.length; i++) {
+    const other = clickableObjects[i];
+    if (other === lastClickedObject) continue;
+
+    const otherRadius = getApproxRadius(other) * 0.6;
+    const minDist = myRadius + otherRadius + margin;
+
+    const otherPos = other.position.clone();
+    const dist = newPos.distanceTo(otherPos);
+
+    if (dist < minDist) {
+      // Too close to this object -> block movement this frame
+      return;
+    }
   }
 
-  lastClickedObject.position.add(displacement);
+  // No collisions -> move
+  lastClickedObject.position.copy(newPos);
 }
-
 
 /**********************************************************************
  * ANIMATION LOOP
