@@ -15,7 +15,7 @@ It demonstrates:
 The main goal is to create a **small, self-contained environment** where the user can:
 
 - Click on objects to select them and apply gravity.
-- Move the selected object around while respecting simple collision constraints.
+- Move the selected object around while respecting simple collision constraints. ( In Progress )
 - Spawn falling spheres and projectiles with custom speed and angle.
 - Switch gravity presets (Earth / Moon / Jupiter) and see how motion changes physically and visually (floor texture).
 
