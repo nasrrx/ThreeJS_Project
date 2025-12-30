@@ -1,19 +1,20 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.117.1/build/three.module.js";
 
 /**********************************************************************
- * WAVE LAB (UI HEAVY)
+ * WAVE LAB (UI HEAVY) — NO INTERACTION
  * - Grid + floor + optional axes
  * - Wave line (points) with optional second wave (interference)
  * - Standing wave mode
- * - Damping
  * - Color modes (height-based / speed-based / solid)
- * - Click to add impulse (ripple bump) on the line
  * - Pause / Step / Reset / Presets
- * - Simple orbit camera (drag) + zoom (wheel)
+ * - Optional auto-rotate camera (no drag, no wheel, no click)
+ *
+ * NOTE:
+ * - Removed ALL interaction: click impulses, raycasting, pointer/drag, wheel zoom, keyboard hotkeys.
+ * - Removed Phase, Damping, Height Scale (as before).
  **********************************************************************/
 
 let scene, camera, renderer, clock;
-let raycaster, mouse;
 
 let gridHelper, axesHelper, floorMesh;
 let waveGroup, points = [], line;
@@ -22,12 +23,10 @@ let uiRoot;
 let isPaused = false;
 let stepOnce = false;
 
-// Simple orbit camera controls
+// Static orbit camera (still “orbits” if autoRotate is enabled)
 let orbitYaw = 0.2;
 let orbitPitch = -0.35;
 let orbitRadius = 12.0;
-let isDragging = false;
-let lastMX = 0, lastMY = 0;
 
 // Wave configuration
 const params = {
@@ -35,8 +34,6 @@ const params = {
   amplitude: 1.2,
   frequency: 1.6,
   speed: 2.2,
-  phase: 0.0,
-  damping: 0.012,        // damping applied to impulse velocities
   spacing: 0.18,
   pointCount: 140,
 
@@ -45,16 +42,10 @@ const params = {
   ampB: 0.7,
   freqB: 1.65,
   speedB: 2.1,
-  phaseB: 1.0,
+  phaseB: 1.0, // kept (Wave B only)
 
   // standing wave mode
   standingWave: false,
-
-  // impulses
-  clickImpulseEnabled: true,
-  impulseStrength: 1.0,
-  impulseRadius: 6,      // in points
-  impulseFalloff: 1.0,   // 0..2
 
   // visuals
   showGrid: true,
@@ -63,8 +54,7 @@ const params = {
   showLine: true,
   showPoints: true,
   pointSize: 0.06,
-  lineThicknessHint: 1, // (WebGL line width is mostly ignored, but kept as option)
-  heightScale: 1.0,
+  lineThicknessHint: 1,
 
   // color
   colorMode: "height",  // "height" | "velocity" | "solid"
@@ -75,10 +65,6 @@ const params = {
   autoRotate: false,
   autoRotateSpeed: 0.25
 };
-
-// impulse state (extra “kick” per point)
-let impulseVel = new Float32Array(params.pointCount);
-let impulsePos = new Float32Array(params.pointCount);
 
 init();
 animate();
@@ -122,30 +108,12 @@ function init() {
   // Wave objects
   buildWave();
 
-  // Raycast for click impulses
-  raycaster = new THREE.Raycaster();
-  mouse = new THREE.Vector2();
-
   // UI
   buildUI();
   applyAllToggles();
 
-  // Events
+  // Only resize event (no other interaction)
   window.addEventListener("resize", onResize);
-
-  renderer.domElement.addEventListener("pointerdown", onPointerDown);
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", onPointerUp);
-  renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
-
-  renderer.domElement.addEventListener("click", onClickImpulse);
-
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "KeyP") togglePause();
-    if (e.code === "KeyO") { stepOnce = true; isPaused = true; refreshPauseBtnText(); }
-    if (e.code === "KeyR") resetSim();
-    if (e.code === "KeyG") { params.showGrid = !params.showGrid; applyAllToggles(); syncUI(); }
-  });
 }
 
 /**********************************************************************
@@ -184,11 +152,6 @@ function buildWave() {
   waveGroup = new THREE.Group();
   scene.add(waveGroup);
 
-  // reset impulse buffers to match new count
-  impulseVel = new Float32Array(params.pointCount);
-  impulsePos = new Float32Array(params.pointCount);
-
-  // points
   points.length = 0;
 
   const geoPoint = new THREE.SphereGeometry(params.pointSize, 12, 12);
@@ -205,9 +168,6 @@ function buildWave() {
     const x = (i - params.pointCount / 2) * params.spacing;
     p.position.set(x, 0, 0);
 
-    // store index for picking
-    p.userData.waveIndex = i;
-
     waveGroup.add(p);
     points.push(p);
   }
@@ -221,18 +181,16 @@ function buildWave() {
     color: 0xffffff,
     transparent: true,
     opacity: 0.55
-    // linewidth: params.lineThicknessHint (ignored by most browsers)
   });
 
   line = new THREE.Line(lineGeo, lineMat);
   waveGroup.add(line);
 
-  // initial sync
   updateLineGeometry();
 }
 
 /**********************************************************************
- * UI
+ * UI (kept, but no keyboard/mouse bindings)
  **********************************************************************/
 function buildUI() {
   uiRoot = document.createElement("div");
@@ -256,7 +214,7 @@ function buildUI() {
       <div>
         <div style="font-weight:900; font-size:14px; letter-spacing:0.3px;">Wave Lab</div>
         <div style="opacity:0.75; font-size:12px;">
-          Drag: orbit • Wheel: zoom • Click: impulse • P: pause • O: step • R: reset • G: grid
+          No interaction • Use UI controls only
         </div>
       </div>
       <div style="display:flex; gap:8px;">
@@ -275,9 +233,6 @@ function buildUI() {
       ${slider("Amplitude", "amplitude", 0, 3, 0.01)}
       ${slider("Frequency", "frequency", 0.1, 5, 0.01)}
       ${slider("Speed", "speed", 0.1, 8, 0.01)}
-      ${slider("Phase", "phase", -Math.PI, Math.PI, 0.01)}
-      ${slider("Height Scale", "heightScale", 0.2, 2.5, 0.01)}
-      ${slider("Damping", "damping", 0.0, 0.08, 0.001)}
 
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
         ${toggle("Standing Wave", "standingWave")}
@@ -291,21 +246,6 @@ function buildUI() {
         ${slider("Speed B", "speedB", 0.1, 8, 0.01)}
         ${slider("Phase B", "phaseB", -Math.PI, Math.PI, 0.01)}
       </div>
-    </details>
-
-    <div style="height:10px;"></div>
-
-    <details style="border:1px solid rgba(255,255,255,0.10); border-radius:12px; padding:10px;">
-      <summary style="cursor:pointer; font-weight:800; font-size:12px; opacity:0.9;">Impulse & Interaction</summary>
-      <div style="height:8px;"></div>
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        ${toggle("Click Impulses", "clickImpulseEnabled")}
-      </div>
-
-      ${slider("Impulse Strength", "impulseStrength", 0.0, 3.0, 0.01)}
-      ${slider("Impulse Radius (pts)", "impulseRadius", 1, 18, 1)}
-      ${slider("Impulse Falloff", "impulseFalloff", 0.0, 2.0, 0.01)}
     </details>
 
     <div style="height:10px;"></div>
@@ -330,7 +270,6 @@ function buildUI() {
           <div style="font-size:12px; opacity:0.85;">Color Mode</div>
           <select id="selColorMode" style="${selectStyle()}">
             <option value="height">Height (blue→white→red)</option>
-            <option value="velocity">Velocity (green→yellow→red)</option>
             <option value="solid">Solid</option>
           </select>
         </div>
@@ -368,7 +307,7 @@ function buildUI() {
   // Buttons
   document.getElementById("btnPause").onclick = togglePause;
   document.getElementById("btnStep").onclick = () => { stepOnce = true; isPaused = true; refreshPauseBtnText(); };
-  document.getElementById("btnReset").onclick = resetSim;
+  document.getElementById("btnReset").onclick = () => { resetSim(); };
 
   // Presets
   document.getElementById("btnPresetSine").onclick = () => applyPreset("sine");
@@ -380,24 +319,17 @@ function buildUI() {
   bindSlider("amplitude", () => {});
   bindSlider("frequency", () => {});
   bindSlider("speed", () => {});
-  bindSlider("phase", () => {});
-  bindSlider("heightScale", () => {});
-  bindSlider("damping", () => {});
   bindSlider("ampB", () => {});
   bindSlider("freqB", () => {});
   bindSlider("speedB", () => {});
   bindSlider("phaseB", () => {});
-  bindSlider("impulseStrength", () => {});
-  bindSlider("impulseRadius", () => {});
-  bindSlider("impulseFalloff", () => {});
-  bindSlider("pointSize", () => rebuildWave()); // changes geometry
+  bindSlider("pointSize", () => rebuildWave());
   bindSlider("colorIntensity", () => {});
   bindSlider("autoRotateSpeed", () => {});
 
   // Toggles
   bindToggle("standingWave", () => {});
   bindToggle("waveBEnabled", () => updateWaveBBlock());
-  bindToggle("clickImpulseEnabled", () => {});
   bindToggle("showGrid", applyAllToggles);
   bindToggle("showAxes", applyAllToggles);
   bindToggle("showFloor", applyAllToggles);
@@ -537,8 +469,7 @@ function refreshPauseBtnText() {
 }
 
 function syncUI() {
-  // sync toggles quickly (for hotkeys)
-  const keys = ["showGrid","showAxes","showFloor","showLine","showPoints","autoRotate","standingWave","waveBEnabled","clickImpulseEnabled"];
+  const keys = ["showGrid","showAxes","showFloor","showLine","showPoints","autoRotate","standingWave","waveBEnabled"];
   for (const k of keys) {
     const el = document.getElementById("tg_" + k);
     if (el) el.checked = !!params[k];
@@ -547,15 +478,13 @@ function syncUI() {
 }
 
 /**********************************************************************
- * SIM + WAVE UPDATE
+ * WAVE UPDATE (analytic)
  **********************************************************************/
 function resetSim() {
-  impulseVel.fill(0);
-  impulsePos.fill(0);
+  // no impulses anymore, so reset is just a redraw (kept for UI consistency)
 }
 
 function rebuildWave() {
-  // rebuild geometry/points if point size changed etc.
   buildWave();
   applyAllToggles();
 }
@@ -565,7 +494,6 @@ function applyAllToggles() {
   if (axesHelper) axesHelper.visible = !!params.showAxes;
   if (floorMesh) floorMesh.visible = !!params.showFloor;
   if (line) line.visible = !!params.showLine;
-
   for (const p of points) p.visible = !!params.showPoints;
 }
 
@@ -576,14 +504,11 @@ function waveY(i, t) {
   const s = params.speed;
 
   if (params.standingWave) {
-    // standing wave: sin(kx) * sin(wt)
-    return a * Math.sin(x * f) * Math.sin(t * s + params.phase);
+    return a * Math.sin(x * f) * Math.sin(t * s);
   }
 
-  // traveling wave
-  let y = Math.sin(x * f + t * s + params.phase) * a;
+  let y = Math.sin(x * f + t * s) * a;
 
-  // optional second wave
   if (params.waveBEnabled) {
     y += Math.sin(x * params.freqB + t * params.speedB + params.phaseB) * params.ampB;
   }
@@ -591,39 +516,17 @@ function waveY(i, t) {
   return y;
 }
 
-function stepImpulse(dt) {
-  // damped springy impulse per point (simple)
-  const damp = clamp(params.damping, 0, 0.2);
-  const k = 24; // stiffness
-  for (let i = 0; i < impulsePos.length; i++) {
-    impulseVel[i] += (-impulsePos[i] * k) * dt;    // pull back to zero
-    impulseVel[i] *= (1.0 - damp);                 // damping
-    impulsePos[i] += impulseVel[i] * dt;
-    impulsePos[i] = clamp(impulsePos[i], -3.0, 3.0);
-  }
-}
-
 function updateWave() {
   const t = clock.getElapsedTime();
 
-  // optional auto rotate
   if (params.autoRotate) {
     orbitYaw += params.autoRotateSpeed * 0.0025;
     updateCamera();
   }
 
-  // impulse update
-  stepImpulse(Math.min(clock.getDelta(), 0.033)); // safe dt for impulse only
-  // Note: we also use dt in animate() for general stepping
-
-  // update points
   for (let i = 0; i < points.length; i++) {
-    const base = waveY(i, t) * params.heightScale;
-    const extra = impulsePos[i] * params.heightScale;
-    const y = base + extra;
+    const y = waveY(i, t);
     points[i].position.y = y;
-
-    // color update
     applyPointColor(i, y);
   }
 
@@ -635,29 +538,16 @@ function applyPointColor(i, y) {
   if (!p.material || !p.material.color) return;
 
   if (params.colorMode === "solid") {
-    // handled by applySolidColorToPoints() (but keep safe if toggled mid-frame)
     p.material.color.set(params.solidColor);
     return;
   }
 
+  // "velocity" mode removed since we removed impulses; keep menu simple.
   if (params.colorMode === "height") {
-    // height mapped: blue -> white -> red
     const t = clamp((y * 0.45 * params.colorIntensity) + 0.5, 0, 1);
     const r = t < 0.5 ? lerp(0.25, 1.0, t * 2) : 1.0;
     const g = t < 0.5 ? lerp(0.35, 1.0, t * 2) : lerp(1.0, 0.35, (t - 0.5) * 2);
     const b = t < 0.5 ? 1.0 : lerp(1.0, 0.25, (t - 0.5) * 2);
-    p.material.color.setRGB(r, g, b);
-    return;
-  }
-
-  if (params.colorMode === "velocity") {
-    // approximate velocity = impulseVel (since base wave is analytic)
-    const v = impulseVel[i];
-    const t = clamp(Math.abs(v) * 0.25 * params.colorIntensity, 0, 1);
-    // green -> yellow -> red
-    const r = t < 0.5 ? lerp(0.1, 1.0, t * 2) : 1.0;
-    const g = t < 0.5 ? 1.0 : lerp(1.0, 0.15, (t - 0.5) * 2);
-    const b = lerp(0.15, 0.05, t);
     p.material.color.setRGB(r, g, b);
   }
 }
@@ -673,46 +563,7 @@ function updateLineGeometry() {
 }
 
 /**********************************************************************
- * INTERACTION: CLICK IMPULSE
- **********************************************************************/
-function onClickImpulse(e) {
-  if (!params.clickImpulseEnabled) return;
-  if (uiRoot && uiRoot.contains(e.target)) return; // ignore clicks on UI
-  if (isDragging) return; // avoid impulse when orbit-dragging
-
-  // pick nearest point by raycasting to point meshes
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-
-  raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(points, false);
-  if (!hits.length) return;
-
-  const idx = hits[0].object.userData.waveIndex ?? -1;
-  if (idx < 0) return;
-
-  addImpulseAtIndex(idx);
-}
-
-function addImpulseAtIndex(centerIdx) {
-  const strength = params.impulseStrength;
-  const radius = Math.max(1, Math.floor(params.impulseRadius));
-  const fall = Math.max(0.001, params.impulseFalloff);
-
-  for (let i = centerIdx - radius; i <= centerIdx + radius; i++) {
-    if (i < 0 || i >= impulseVel.length) continue;
-
-    const d = Math.abs(i - centerIdx);
-    const t = 1.0 - (d / radius);
-    const falloff = Math.pow(Math.max(0, t), fall);
-
-    impulseVel[i] += strength * falloff * 3.5;
-  }
-}
-
-/**********************************************************************
- * CAMERA CONTROLS
+ * CAMERA (only via autoRotate)
  **********************************************************************/
 function updateCamera() {
   const x = Math.cos(orbitYaw) * Math.cos(orbitPitch) * orbitRadius;
@@ -723,50 +574,15 @@ function updateCamera() {
   camera.lookAt(0, 0.4, 0);
 }
 
-function onPointerDown(e) {
-  if (e.target !== renderer.domElement) return;
-  isDragging = true;
-  lastMX = e.clientX;
-  lastMY = e.clientY;
-}
-
-function onPointerMove(e) {
-  if (!isDragging) return;
-
-  const dx = e.clientX - lastMX;
-  const dy = e.clientY - lastMY;
-  lastMX = e.clientX;
-  lastMY = e.clientY;
-
-  orbitYaw -= dx * 0.004;
-  orbitPitch -= dy * 0.004;
-  orbitPitch = clamp(orbitPitch, -1.15, 0.05);
-
-  updateCamera();
-}
-
-function onPointerUp() {
-  isDragging = false;
-}
-
-function onWheel(e) {
-  e.preventDefault();
-  orbitRadius += (e.deltaY * 0.01);
-  orbitRadius = clamp(orbitRadius, 6.0, 28.0);
-  updateCamera();
-}
-
 /**********************************************************************
  * LOOP
  **********************************************************************/
 function animate() {
   requestAnimationFrame(animate);
 
-  const dt = Math.min(clock.getDelta(), 0.033);
+  clock.getDelta(); // keep clock advancing consistently
 
   if (!isPaused || stepOnce) {
-    // “dt” not strictly needed for analytic wave, but used for impulse stepping inside updateWave()
-    // We still call updateWave() once per sim tick
     updateWave();
     stepOnce = false;
   }
@@ -789,54 +605,41 @@ function onResize() {
 function applyPreset(name) {
   if (name === "sine") {
     Object.assign(params, {
-      amplitude: 1.2, frequency: 1.6, speed: 2.2, phase: 0.0,
+      amplitude: 1.2, frequency: 1.6, speed: 2.2,
       standingWave: false,
       waveBEnabled: false,
-      damping: 0.012,
-      colorMode: "height",
-      clickImpulseEnabled: true,
-      impulseStrength: 1.0,
-      impulseRadius: 6,
-      impulseFalloff: 1.0
+      colorMode: "height"
     });
   }
 
   if (name === "beats") {
     Object.assign(params, {
-      amplitude: 1.0, frequency: 1.55, speed: 2.0, phase: 0.0,
+      amplitude: 1.0, frequency: 1.55, speed: 2.0,
       waveBEnabled: true, ampB: 0.95, freqB: 1.60, speedB: 2.0, phaseB: 0.8,
       standingWave: false,
-      damping: 0.010,
       colorMode: "height"
     });
   }
 
   if (name === "standing") {
     Object.assign(params, {
-      amplitude: 1.6, frequency: 1.3, speed: 2.5, phase: 0.0,
+      amplitude: 1.6, frequency: 1.3, speed: 2.5,
       standingWave: true,
       waveBEnabled: false,
-      damping: 0.014,
       colorMode: "height"
     });
   }
 
   if (name === "calm") {
     Object.assign(params, {
-      amplitude: 0.7, frequency: 1.1, speed: 1.4, phase: 0.0,
+      amplitude: 0.7, frequency: 1.1, speed: 1.4,
       standingWave: false,
       waveBEnabled: false,
-      damping: 0.020,
       colorMode: "solid",
-      solidColor: "#7bd3ff",
-      clickImpulseEnabled: true,
-      impulseStrength: 0.7,
-      impulseRadius: 8,
-      impulseFalloff: 1.4
+      solidColor: "#7bd3ff"
     });
   }
 
-  resetSim();
   applyAllToggles();
   updateWaveBBlock();
   updateSolidColorVisibility();
@@ -846,9 +649,8 @@ function applyPreset(name) {
 
 function refreshAllSliderLabels() {
   const sliderKeys = [
-    "amplitude","frequency","speed","phase","heightScale","damping",
+    "amplitude","frequency","speed",
     "ampB","freqB","speedB","phaseB",
-    "impulseStrength","impulseRadius","impulseFalloff",
     "pointSize","colorIntensity","autoRotateSpeed"
   ];
 
