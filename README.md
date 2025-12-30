@@ -1,5 +1,17 @@
-# Physics Playground – CSCI452 Project Phase 1
+# Physics Playground Suite – CSCI452 (Three.js)
 
+
+## 0. Modes (Main Menu)
+
+This repo boots into a **Main Menu** that lets you launch each mode in complete isolation (fresh scene/camera/renderer per entry file):
+
+- **Playground** (`main.js`) – the original physics playground (gravity presets, projectiles, collisions).
+- **FPS Shooter** (`fps.js`) – pointer-lock shooter with hitscan, damage/HP, threats, and a death/respawn loop.
+- **Wave Lab** (`wave.js`) – an interactive wave visualization (no gravity) with a configurable UI (sliders/toggles/colors, etc.).
+
+Modes are selected via URL query string: `?mode=playground | fps | wave` and are also available as buttons in the menu.
+
+---
 ## 1. Project Description & Objectives
 
 **Project Title:** Physics Playground – Gravity, Collisions, and Projectile Motion in Three.js
@@ -197,11 +209,35 @@ Typical structure:
     <meta charset="UTF-8" />
     <title>Physics Playground</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script type="module" src="main.js"></script>
+    <script type="module" src="boot.js"></script>
   </head>
   <body></body>
 </html>
 ```
+### `boot.js`
+
+- Boot loader that:
+  - Shows the **menu overlay** when no mode is selected.
+  - Sets the URL to `?mode=<...>` when a button is clicked.
+  - Dynamically imports **only** the selected entry file (`main.js`, `fps.js`, or `wave.js`).
+  - Provides a **Return** button that clears the mode and reloads back to the menu.
+
+### `fps.js`
+
+- Standalone FPS mode:
+  - Pointer lock + mouse look
+  - WASD movement (sprint/jump)
+  - Hitscan shooting (raycasting)
+  - Incoming “threat” spawning + HP/score/kills UI
+  - Damage FX + death screen + respawn reset
+
+### `wave.js`
+
+- Standalone Wave Lab mode:
+  - Wave visualization demo (no gravity)
+  - Interactive UI (sliders/toggles) to explore wave parameters
+  - Intended as a separate educational physics visualization mode
+
 
 ### `main.js`
 
@@ -258,6 +294,9 @@ Place files like this:
 project-root/
   index.html
   main.js
+  boot.js
+  fps.js
+  wave.js
   EarthTexture.png
   JupiterTexture.jpg
   MoonTexture.jpg
@@ -305,6 +344,30 @@ Use any local static server (Node `http-server`, XAMPP, etc.) and point it to th
 - **Left mouse drag** – orbit around the scene.
 - **Mouse wheel** – zoom in/out.
 - Camera orbit is implemented manually using `THREE.Spherical`.
+
+
+### Main Menu
+
+- Use the menu buttons to switch modes.
+- **Return** button clears the current mode and reloads back to the menu (clean reset).
+
+### FPS Shooter (fps.js)
+
+- **Click** the canvas to lock pointer (mouse look).
+- **Mouse Move** – look.
+- **LMB** – shoot (hitscan).
+- **W/A/S/D** – move.
+- **Shift** – sprint.
+- **Space** – jump.
+- Survive incoming threats; on death, use **Respawn**.
+
+### Wave Lab (wave.js)
+
+- Interact using the on-screen UI (sliders/toggles).
+- Common interactions:
+  - Adjust wave parameters (amplitude/frequency/speed, etc.).
+  - Toggle visualization helpers (grid/source markers, etc.) if enabled in the UI.
+
 
 ### Object Selection & Movement
 
