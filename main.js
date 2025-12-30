@@ -10,7 +10,7 @@ let raycaster, mouse;
 let collisionRaycaster;
 let textureLoader;
 
-let planet;
+
 let plane;
 let bouncingSphere;
 let spinningTorus;
@@ -19,6 +19,7 @@ let wall;
 let energyCone;
 
 const clickableObjects = [];
+
 
 let clock;
 let timeElapsed = 0;
@@ -102,51 +103,6 @@ let coneOriginalMaterial = null;
 let coneIsGlass = false;
 
 
-function setPlanetTexture(planetMesh, planetType) {
-  if (!textureLoader || !planetMesh || !planetMesh.material) return;
-
-  let fileName;
-  switch (planetType) {
-    case "earth":
-      fileName = "EarthTexture.png";
-      break;
-    case "jupiter":
-      fileName = "JupiterTexture.jpg";
-      break;
-    case "moon":
-      fileName = "MoonTexture.jpg";
-      break;
-    default:
-      fileName = null;
-  }
-
-  if (!fileName) {
-    planetMesh.material.map = null;
-    planetMesh.material.color.set(0xaaaaaa);
-    planetMesh.material.needsUpdate = true;
-    return;
-  }
-
-  textureLoader.load(fileName, (tex) => {
-    planetMesh.material.map = tex;
-    planetMesh.material.color.set(0xffffff);
-    planetMesh.material.needsUpdate = true;
-  });
-}
-
-
-  function placeObjectOnPlanet(object, phi, theta, radius) {
-  // Calculate position on the planet's surface using spherical coordinates
-  const x = radius * Math.sin(phi) * Math.cos(theta);
-  const y = radius * Math.cos(phi);  // height based on phi
-  const z = radius * Math.sin(phi) * Math.sin(theta);
-
-  object.position.set(x, y, z);  // Set the object's position on the planet surface
-  object.castShadow = true;
-  object.receiveShadow = true;
-  scene.add(object);  // Add the object to the scene
-}
-
 /**********************************************************************
  * ENTRY POINT
  **********************************************************************/
@@ -177,26 +133,30 @@ function init() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  /*********** PLANET (SPHERE) ***********/
-  const planetGeometry = new THREE.SphereGeometry(50, 64, 64);  // Larger sphere
-  const planetMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
-  planet = new THREE.Mesh(planetGeometry, planetMaterial);
+  /*********** LIGHTING ***********/
+  const ambientLight = new THREE.AmbientLight(0x404040, 0.9);
+  scene.add(ambientLight);
 
-  // Load texture for planet surface (for example, Earth texture)
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(5, 10, 4);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
 
+  const pointLight = new THREE.PointLight(0xffffff, 0.8, 20);
+  pointLight.position.set(-4, 6, 4);
+  scene.add(pointLight);
 
-  planet.rotation.x = Math.PI / 2; // Rotate so the top of the sphere faces up
-  planet.position.y = -50;  // Position the planet below the camera
-  planet.receiveShadow = true;
-  scene.add(planet);
+  /*********** PLANE (GROUND) ***********/
+  const planeGeometry = new THREE.PlaneGeometry(20, 20);
+  const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  plane = new THREE.Mesh(planeGeometry, planeMaterial);
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = 0;
+  plane.receiveShadow = true;
+  scene.add(plane);
 
-  setPlanetTexture(planet, "earth");// You can modify this function to load different textures
+  setPlanetFloor("earth");
 
-  /*********** OBJECTS ON THE PLANET ***********/
-  // Example: Place objects on the surface of the planet
-  placeObjectOnPlanet(bouncingSphere, 0, 1, 10);
-  placeObjectOnPlanet(spinningTorus, Math.PI / 4, 0, 20);  // Example placement for spinningTorus
-  placeObjectOnPlanet(rotatingCube, Math.PI / 3, 0, -15);  // Example placement for rotatingCube
 
   /*********** COLORS ***********/
   const COLORS = {
@@ -253,13 +213,6 @@ function init() {
   clickableObjects.push(energyCone);
   coneOriginalMaterial = energyCone.material;
 
-
-  // AFTER creating bouncingSphere, spinningTorus, rotatingCube
-placeObjectOnPlanet(bouncingSphere, 0, 1, 10);
-placeObjectOnPlanet(spinningTorus, Math.PI / 4, 0, 20);
-placeObjectOnPlanet(rotatingCube, Math.PI / 3, 0, 15);
-
-
   /*********** AXES HELPER ***********/
   const axes = new THREE.AxesHelper(3);
   scene.add(axes);
@@ -286,6 +239,9 @@ placeObjectOnPlanet(rotatingCube, Math.PI / 3, 0, 15);
 
   /*********** RESIZE ***********/
   window.addEventListener("resize", onWindowResize);
+
+
+
 }
 
 function setPlanetFloor(planet) {
@@ -330,6 +286,7 @@ function setPlanetFloor(planet) {
   );
 }
 
+
 /**********************************************************************
  * UI CREATION
  **********************************************************************/
@@ -373,6 +330,7 @@ function createUI() {
     </div>
   `;
 
+
   /***************************************************************
    * SECTION: GRAVITY TOOLS
    ***************************************************************/
@@ -410,7 +368,8 @@ function createUI() {
   gravitySection.appendChild(gravityBtn);
   gravitySection.appendChild(presetRow);
 
-  /***************************************************************
+
+    /***************************************************************
    * SECTION: PROJECTILE LAUNCHER
    ***************************************************************/
   const projectileSection = createSection("Projectile Launcher");
@@ -478,67 +437,67 @@ function createUI() {
   projectileSection.appendChild(spawnProjectileBtn);
   projectileSection.appendChild(clearProjectilesBtn);
 
-  /***************************************************************
-   * SECTION: OBJECT SPAWN
-   ***************************************************************/
-  const spawnSection = createSection("Spawn Objects");
+    /***************************************************************
+     * SECTION: OBJECT SPAWN
+     ***************************************************************/
+    const spawnSection = createSection("Spawn Objects");
 
-  spawnSphereBtn = document.createElement("button");
-  spawnSphereBtn.textContent = "Spawn Falling Sphere";
-  spawnSphereBtn.style.fontSize = "12px";
+    spawnSphereBtn = document.createElement("button");
+    spawnSphereBtn.textContent = "Spawn Falling Sphere";
+    spawnSphereBtn.style.fontSize = "12px";
 
-  spawnSection.appendChild(spawnSphereBtn);
+    spawnSection.appendChild(spawnSphereBtn);
 
-  /***************************************************************
-   * SECTION: ANIMATION SPEED
-   ***************************************************************/
-  const speedSection = createSection("Animation Speed");
 
-  const speedRow1 = document.createElement("div");
-  speedRow1.style.fontSize = "12px";
+    /***************************************************************
+     * SECTION: ANIMATION SPEED
+     ***************************************************************/
+    const speedSection = createSection("Animation Speed");
 
-  const labelObject = document.createElement("label");
-  labelObject.textContent = "Target: ";
+    const speedRow1 = document.createElement("div");
+    speedRow1.style.fontSize = "12px";
 
-  speedTargetSelect = document.createElement("select");
-  speedTargetSelect.style.fontSize = "12px";
+    const labelObject = document.createElement("label");
+    labelObject.textContent = "Target: ";
 
-    // CONTINUED FROM THE LAST PART
+    speedTargetSelect = document.createElement("select");
+    speedTargetSelect.style.fontSize = "12px";
 
-  ["sphere", "torus", "cube", "all"].forEach((val) => {
-    const opt = document.createElement("option");
-    opt.value = val;
-    opt.textContent = val.charAt(0).toUpperCase() + val.slice(1);
-    speedTargetSelect.appendChild(opt);
-  });
+    ["sphere", "torus", "cube", "all"].forEach((val) => {
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = val.charAt(0).toUpperCase() + val.slice(1);
+      speedTargetSelect.appendChild(opt);
+    });
 
-  speedRow1.appendChild(labelObject);
-  speedRow1.appendChild(speedTargetSelect);
+    speedRow1.appendChild(labelObject);
+    speedRow1.appendChild(speedTargetSelect);
 
-  const speedRow2 = document.createElement("div");
-  speedRow2.style.fontSize = "12px";
-  speedRow2.style.marginTop = "4px";
+    const speedRow2 = document.createElement("div");
+    speedRow2.style.fontSize = "12px";
+    speedRow2.style.marginTop = "4px";
 
-  const labelSpeed = document.createElement("label");
-  labelSpeed.textContent = "Multiplier: ";
+    const labelSpeed = document.createElement("label");
+    labelSpeed.textContent = "Multiplier: ";
 
-  speedInput = document.createElement("input");
-  speedInput.type = "number";
-  speedInput.step = "0.1";
-  speedInput.value = "1";
-  speedInput.style.width = "60px";
+    speedInput = document.createElement("input");
+    speedInput.type = "number";
+    speedInput.step = "0.1";
+    speedInput.value = "1";
+    speedInput.style.width = "60px";
 
-  applySpeedBtn = document.createElement("button");
-  applySpeedBtn.textContent = "Apply";
-  applySpeedBtn.style.marginLeft = "4px";
-  applySpeedBtn.style.fontSize = "12px";
+    applySpeedBtn = document.createElement("button");
+    applySpeedBtn.textContent = "Apply";
+    applySpeedBtn.style.marginLeft = "4px";
+    applySpeedBtn.style.fontSize = "12px";
 
-  speedRow2.appendChild(labelSpeed);
-  speedRow2.appendChild(speedInput);
-  speedRow2.appendChild(applySpeedBtn);
+    speedRow2.appendChild(labelSpeed);
+    speedRow2.appendChild(speedInput);
+    speedRow2.appendChild(applySpeedBtn);
 
-  speedSection.appendChild(speedRow1);
-  speedSection.appendChild(speedRow2);
+    speedSection.appendChild(speedRow1);
+    speedSection.appendChild(speedRow2);
+
 
   /***************************************************************
    * SECTION: VISUAL EFFECTS
@@ -550,6 +509,7 @@ function createUI() {
   glassModeBtn.style.fontSize = "12px";
 
   visualSection.appendChild(glassModeBtn);
+
 
   /***************************************************************
    * SECTION: SELECTED OBJECT INFO
@@ -563,6 +523,7 @@ function createUI() {
 
   infoSection.appendChild(lastRow);
 
+
   /***************************************************************
    * ADD SECTIONS TO UI ROOT
    ***************************************************************/
@@ -574,6 +535,7 @@ function createUI() {
   ui.appendChild(infoSection);
 
   document.body.appendChild(ui);
+
 
   /***************************************************************
    * EVENT LISTENERS
@@ -924,11 +886,13 @@ function onWindowResize() {
 /**********************************************************************
  * MOVEMENT + COLLISION WITH OBJECTS
  **********************************************************************/
+
 function getApproxRadius(object) {
   const box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3());
-  return size.length() * 0.4; // half of the diagonal as a rough radius
+  return size.length() * 0.5; // half of the diagonal as a rough radius
 }
+
 
 function updateLastClickedMovement(delta) {
   if (!lastClickedObject) return;
@@ -1064,7 +1028,7 @@ function animate() {
     if (!p.active) continue;
 
     p.velocity.addScaledVector(p.acceleration, delta);
-        p.mesh.position.addScaledVector(p.velocity, delta);
+    p.mesh.position.addScaledVector(p.velocity, delta);
 
     const floorY = p.radius; // ground at y=0
     if (p.mesh.position.y <= floorY) {
@@ -1078,7 +1042,3 @@ function animate() {
 
   renderer.render(scene, camera);
 }
-console.log("planet:", planet);
-console.log("planet.material:", planet?.material);
-
-
