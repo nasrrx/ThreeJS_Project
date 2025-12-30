@@ -3,99 +3,423 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Main Menu Boot</title>
+  <meta name="color-scheme" content="dark"/>
+  <title>Physics Lab — Main Menu</title>
+
   <style>
-    body { margin: 0; overflow: hidden; background: #000; font-family: system-ui; }
-
-    /* Full-screen menu */
-    #menuOverlay {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      display: none; /* boot.js decides */
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(circle at 30% 20%, rgba(90,90,120,0.25), rgba(0,0,0,0.92));
-      color: #fff;
+    :root{
+      --bg0:#04040a;
+      --bg1:#080816;
+      --panel: rgba(10,10,18,0.62);
+      --panel2: rgba(0,0,0,0.35);
+      --stroke: rgba(255,255,255,0.14);
+      --stroke2: rgba(255,255,255,0.08);
+      --text: rgba(255,255,255,0.96);
+      --muted: rgba(255,255,255,0.72);
+      --muted2: rgba(255,255,255,0.55);
+      --btn: rgba(255,255,255,0.08);
+      --btnHover: rgba(255,255,255,0.16);
+      --accent: rgba(120,160,255,0.85);
+      --accent2: rgba(255,120,190,0.55);
+      --shadow: 0 22px 70px rgba(0,0,0,0.65);
+      --shadow2: inset 0 1px 0 rgba(255,255,255,0.06);
+      --radius: 18px;
     }
 
-    #menuCard {
-      width: min(420px, 92vw);
-      padding: 18px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(8px);
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-      text-align: center;
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      overflow:hidden;
+      background: radial-gradient(1200px 700px at 25% 20%, rgba(90,110,255,0.10), transparent 55%),
+                  radial-gradient(900px 600px at 80% 30%, rgba(255,120,190,0.08), transparent 60%),
+                  linear-gradient(180deg, var(--bg1), var(--bg0));
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
     }
 
-    #menuCard h1 {
-      margin: 0 0 10px 0;
-      font-size: 20px;
-      letter-spacing: 0.3px;
+    /* Subtle animated grain + glow */
+    .bgFX{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:1;
+      background:
+        radial-gradient(700px 400px at 35% 25%, rgba(120,160,255,0.10), transparent 60%),
+        radial-gradient(650px 420px at 70% 55%, rgba(255,120,190,0.08), transparent 65%);
+      filter: blur(0px);
+      opacity: 0.9;
+    }
+    .bgFX::after{
+      content:"";
+      position:absolute;
+      inset:-40px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+      mix-blend-mode: overlay;
+      opacity: .18;
+      animation: drift 10s linear infinite;
+    }
+    @keyframes drift{
+      from{ transform: translate3d(0,0,0); }
+      to{ transform: translate3d(-40px, 30px, 0); }
     }
 
-    #menuCard p {
-      margin: 0 0 14px 0;
-      opacity: 0.85;
-      font-size: 13px;
-      line-height: 1.4;
+    /* ==========================
+       FULLSCREEN MENU OVERLAY
+       ========================== */
+    #menuOverlay{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      display:none; /* controlled by boot.js */
+      align-items:center;
+      justify-content:center;
+      padding: 28px 16px;
     }
 
-    .menuBtnRow { display: flex; gap: 10px; justify-content: center; }
-    .menuBtn {
-      cursor: pointer;
-      font-size: 14px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-      min-width: 140px;
+    /* Layout wrapper */
+    .menuWrap{
+      position:relative;
+      z-index:2;
+      width: min(980px, 96vw);
+      display:grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      align-items:stretch;
     }
-    .menuBtn:hover { background: rgba(255,255,255,0.14); }
 
-    /* Small Return button overlay */
-    #returnBtn {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 9998;
-      display: none; /* boot.js decides */
-      cursor: pointer;
-      font-size: 13px;
+    @media (max-width: 860px){
+      .menuWrap{ grid-template-columns: 1fr; }
+    }
+
+    /* Left: Main card */
+    #menuCard{
+      border-radius: var(--radius);
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, var(--panel), rgba(0,0,0,0.50));
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow), var(--shadow2);
+      padding: 26px 22px;
+      overflow:hidden;
+      position:relative;
+    }
+
+    #menuCard::before{
+      content:"";
+      position:absolute;
+      inset:-1px;
+      background: radial-gradient(500px 280px at 20% 15%, rgba(120,160,255,0.18), transparent 55%),
+                  radial-gradient(460px 320px at 80% 20%, rgba(255,120,190,0.12), transparent 60%);
+      opacity: 0.9;
+      pointer-events:none;
+    }
+
+    .menuHeader{
+      position:relative;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    .titleBlock h1{
+      margin:0;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+    }
+    .titleBlock p{
+      margin:8px 0 0 0;
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.5;
+      max-width: 56ch;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
       padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(0,0,0,0.55);
-      color: #fff;
-      backdrop-filter: blur(6px);
+      border-radius: 999px;
+      border: 1px solid var(--stroke2);
+      background: rgba(0,0,0,0.28);
+      color: var(--muted);
+      font-size: 12px;
+      white-space:nowrap;
+      user-select:none;
     }
-    #returnBtn:hover { background: rgba(0,0,0,0.7); }
+    .dot{
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 18px rgba(120,160,255,0.55);
+    }
+
+    .menuDivider{
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+      margin: 14px 0 18px 0;
+      position:relative;
+    }
+
+    .menuBtnGrid{
+      position:relative;
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 860px){
+      .menuBtnGrid{ grid-template-columns: 1fr; }
+    }
+
+    .menuBtn{
+      cursor:pointer;
+      text-align:left;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.22));
+      color: var(--text);
+      padding: 14px 14px;
+      transition: transform .12s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+      user-select:none;
+      min-height: 92px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .menuBtn::before{
+      content:"";
+      position:absolute;
+      inset:-1px;
+      background: radial-gradient(400px 180px at 30% 15%, rgba(120,160,255,0.10), transparent 65%);
+      opacity: 0;
+      transition: opacity .15s ease;
+      pointer-events:none;
+    }
+
+    .menuBtn:hover{
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,0.22);
+      background: linear-gradient(180deg, var(--btnHover), rgba(0,0,0,0.22));
+      box-shadow: 0 16px 46px rgba(0,0,0,0.42);
+    }
+    .menuBtn:hover::before{ opacity: 1; }
+
+    .menuBtn:active{
+      transform: translateY(0px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.34);
+    }
+
+    .btnTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      position:relative;
+      z-index:2;
+    }
+    .btnTitle{
+      font-size: 14.5px;
+      font-weight: 850;
+      letter-spacing: 0.2px;
+    }
+    .btnTag{
+      font-size: 11px;
+      color: var(--muted2);
+      border: 1px solid var(--stroke2);
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.22);
+      white-space:nowrap;
+    }
+    .btnDesc{
+      margin:0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.45;
+      position:relative;
+      z-index:2;
+    }
+
+    /* Right: Info card */
+    .sideCard{
+      border-radius: var(--radius);
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.55));
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow), var(--shadow2);
+      padding: 18px 16px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .sideCard h2{
+      margin: 2px 0 10px 0;
+      font-size: 15px;
+      font-weight: 850;
+      letter-spacing: .2px;
+    }
+    .sideCard .tip{
+      margin: 0 0 12px 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+    .kbdRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 8px;
+    }
+    kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke2);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.88);
+    }
+
+    .miniFooter{
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.10);
+      color: var(--muted2);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    /* ==========================
+       RETURN BUTTON OVERLAY
+       ========================== */
+    #returnBtn{
+      position:fixed;
+      top: 14px;
+      right: 14px;
+      z-index:9998;
+      display:none; /* controlled by boot.js */
+      cursor:pointer;
+      font-size: 13px;
+      font-weight: 750;
+      letter-spacing: 0.2px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(0,0,0,0.62);
+      color:#fff;
+      backdrop-filter: blur(10px);
+      transition: transform .12s ease, background .15s ease, border-color .15s ease;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.45);
+    }
+    #returnBtn:hover{
+      transform: translateY(-1px);
+      background: rgba(0,0,0,0.78);
+      border-color: rgba(255,255,255,0.22);
+    }
+    #returnBtn:active{
+      transform: translateY(0px);
+    }
+
+    /* Accessibility */
+    .menuBtn:focus-visible,
+    #returnBtn:focus-visible{
+      outline: 2px solid rgba(120,160,255,0.8);
+      outline-offset: 3px;
+    }
   </style>
 </head>
 
 <body>
-  <!-- Return button (appears after a mode is chosen) -->
-  <button id="returnBtn">← Return</button>
+  <div class="bgFX"></div>
 
-  <!-- Main menu overlay -->
-  <div id="menuOverlay">
-    <div id="menuCard">
-      <h1>Main Menu</h1>
-      <p>
-        Choose a mode. Each mode runs from its own JS file and loads cleanly.
-      </p>
+  <!-- Return button (shown after a mode is active) -->
+  <button id="returnBtn" aria-label="Return to menu">← Return</button>
 
-      <div class="menuBtnRow">
-        <button class="menuBtn" id="btnPlayground">Playground</button>
-        <button class="menuBtn" id="btnFPS">FPS Shooter</button>
+  <!-- Main Menu Overlay -->
+  <div id="menuOverlay" role="dialog" aria-modal="true" aria-label="Main Menu">
+    <div class="menuWrap">
+
+      <div id="menuCard">
+        <div class="menuHeader">
+          <div class="titleBlock">
+            <h1>Physics Lab</h1>
+            <p>
+              Pick a mode.
+            </p>
+          </div>
+          <div class="pill" title="Runs locally in your browser">
+            <span class="dot"></span>
+            Offline • Three.js
+          </div>
+        </div>
+
+        <div class="menuDivider"></div>
+
+        <div class="menuBtnGrid">
+          <button class="menuBtn" id="btnPlayground" aria-label="Open Playground">
+            <div class="btnTop">
+              <div class="btnTitle">Playground</div>
+              <div class="btnTag">EXP</div>
+            </div>
+            <p class="btnDesc">Experiment freely with objects, motion, and interactions.</p>
+          </button>
+
+          <button class="menuBtn" id="btnFPS" aria-label="Open FPS Shooter">
+            <div class="btnTop">
+              <div class="btnTitle">FPS Shooter</div>
+              <div class="btnTag">Arcade</div>
+            </div>
+            <p class="btnDesc">Pointer-lock movement and hitscan shooting practice.</p>
+          </button>
+
+          <button class="menuBtn" id="btnWaves" aria-label="Open Wave Lab">
+            <div class="btnTop">
+              <div class="btnTitle">Wave Lab</div>
+              <div class="btnTag">Physics</div>
+            </div>
+            <p class="btnDesc">Explore amplitude, frequency, phase, and speed (no gravity).</p>
+          </button>
+        </div>
       </div>
+
+      <aside class="sideCard" aria-label="Quick Tips">
+        <h2>Quick Tips</h2>
+        <p class="tip">
+          Use the Return button anytime to cleanly unload the current mode and jump back here.
+        </p>
+
+        <div class="kbdRow" aria-label="Controls">
+          <kbd>Click</kbd>
+          <kbd>Mouse</kbd>
+          <kbd>W A S D</kbd>
+          <kbd>Shift</kbd>
+          <kbd>Space</kbd>
+          <kbd>Esc</kbd>
+        </div>
+
+        <div class="miniFooter">
+          
+          <div style="margin-top:6px;">Boot loader: <span style="color:var(--muted)">boot.js</span></div>
+        </div>
+      </aside>
+
     </div>
   </div>
 
   <!-- Boot loader -->
   <script type="module" src="./boot.js"></script>
+
+  <!--
+    NOTE:
+    The Wave Lab mode is loaded by boot.js when #btnWaves is clicked.
+    In boot.js, wire it like:
+      btnWaves.addEventListener("click", () => loadMode("./waves.js"));
+  -->
 </body>
 </html>

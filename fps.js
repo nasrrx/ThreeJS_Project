@@ -12,6 +12,9 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.117.1/build/three.m
 let scene, camera, renderer;
 let clock;
 
+let textureLoader;
+
+
 let isPointerLocked = false;
 
 // -------- FX / AUDIO --------
@@ -137,6 +140,7 @@ function init() {
   key.position.set(18, 24, 10);
   key.castShadow = true;
   key.shadow.mapSize.width = 2048;
+  key.shadow.bias = -0.00015;
   key.shadow.mapSize.height = 2048;
   key.shadow.camera.near = 1;
   key.shadow.camera.far = 120;
@@ -147,7 +151,7 @@ function init() {
   scene.add(key);
 
   // Fill light
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.45);
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.05);
   fill.position.set(-16, 10, 18);
   scene.add(fill);
 
@@ -156,18 +160,39 @@ function init() {
   rim.position.set(0, 12, -22);
   scene.add(rim);
 
-  // floor
-  const floorGeo = new THREE.PlaneGeometry(120, 120);
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.95, metalness: 0.0 });
-  const floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
+  textureLoader = new THREE.TextureLoader();
+
+// floor (textured + repeated)
+const floorGeo = new THREE.PlaneGeometry(140, 140);
+
+const floorTex = textureLoader.load(
+  "https://threejs.org/examples/textures/hardwood2_diffuse.jpg",
+  () => { renderer.render(scene, camera); } // quick refresh when loaded
+);
+
+floorTex.wrapS = THREE.RepeatWrapping;
+floorTex.wrapT = THREE.RepeatWrapping;
+floorTex.repeat.set(10, 10);
+floorTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+const floorMat = new THREE.MeshStandardMaterial({
+  map: floorTex,
+  roughness: 0.95,
+  metalness: 0.0
+});
+
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+spawnEnvironmentProps();
 
 
 
   // UI
   createUI();
+  
 
   // input
   renderer.domElement.addEventListener("click", onClickCanvas);
@@ -182,6 +207,32 @@ function init() {
 /**********************************************************************
  * WORLD HELPERS
  **********************************************************************/
+
+function spawnEnvironmentProps() {
+  const crateGeo = new THREE.BoxGeometry(1, 1, 1);
+  const crateMat = new THREE.MeshStandardMaterial({
+    color: 0x6b4a2f,
+    roughness: 0.9,
+    metalness: 0.05
+  });
+
+  for (let i = 0; i < 18; i++) {
+    const crate = new THREE.Mesh(crateGeo, crateMat);
+    crate.castShadow = true;
+    crate.receiveShadow = true;
+
+    crate.position.set(
+      randBetween(-45, 45),
+      0.5,
+      randBetween(-45, 45)
+    );
+
+    crate.rotation.y = Math.random() * Math.PI * 2;
+    crate.scale.setScalar(randBetween(0.8, 1.8));
+
+    scene.add(crate);
+  }
+}
 
 function ensureAudio() {
   if (audioCtx) return;

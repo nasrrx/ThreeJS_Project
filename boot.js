@@ -1,11 +1,12 @@
 // boot.js
 const menuOverlay = document.getElementById("menuOverlay");
-const returnBtn = document.getElementById("returnBtn");
+const returnBtn   = document.getElementById("returnBtn");
 
 const btnPlayground = document.getElementById("btnPlayground");
-const btnFPS = document.getElementById("btnFPS");
+const btnFPS        = document.getElementById("btnFPS");
+const btnWaves      = document.getElementById("btnWaves");
 
-// mode is chosen by URL: ?mode=playground OR ?mode=fps
+// mode is chosen by URL: ?mode=playground OR ?mode=fps OR ?mode=waves
 function getMode() {
   const params = new URLSearchParams(window.location.search);
   return params.get("mode"); // null if none
@@ -25,11 +26,12 @@ function chooseMode(mode) {
 }
 
 // Menu button handlers
-btnPlayground.addEventListener("click", () => chooseMode("playground"));
-btnFPS.addEventListener("click", () => chooseMode("fps"));
+btnPlayground?.addEventListener("click", () => chooseMode("playground"));
+btnFPS?.addEventListener("click", () => chooseMode("fps"));
+btnWaves?.addEventListener("click", () => chooseMode("waves"));
 
 // Return button handler
-returnBtn.addEventListener("click", goToMenu);
+returnBtn?.addEventListener("click", goToMenu);
 
 const mode = getMode();
 
@@ -45,7 +47,10 @@ if (!mode) {
   // Load ONLY the selected app entry
   if (mode === "fps") {
     await import("./fps.js");
+  } else if (mode === "waves") {
+    await import("./waves.js"); // <-- your Wave Lab entry file
   } else {
+    // default: playground / main app
     await import("./main.js");
   }
 }
