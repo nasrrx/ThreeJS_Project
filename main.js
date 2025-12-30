@@ -10,6 +10,8 @@ let raycaster, mouse;
 let collisionRaycaster;
 let textureLoader;
 
+let loader;
+
 
 let plane;
 let bouncingSphere;
@@ -116,7 +118,16 @@ function init() {
   textureLoader = new THREE.TextureLoader();
   clock = new THREE.Clock();
   timeElapsed = 0;
+  const loader = new THREE.TextureLoader();
 
+  const groundMat = new THREE.MeshStandardMaterial({
+  map: loader.load("ground/albedo.jpg"),
+  normalMap: loader.load("ground/normal.jpg"),
+  roughnessMap: loader.load("ground/roughness.jpg"),
+  aoMap: loader.load("ground/ao.jpg"),
+  roughness: 1,
+  metalness: 0
+});
   // Scene
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
@@ -131,28 +142,45 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
+  renderer.physicallyCorrectLights = true;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.7; // tweak between 0.9 – 1.3
+
   document.body.appendChild(renderer.domElement);
 
   /*********** LIGHTING ***********/
-  const ambientLight = new THREE.AmbientLight(0x404040, 0.9);
-  scene.add(ambientLight);
+// Ambient (dimmer)
+const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+scene.add(ambientLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-  dirLight.position.set(5, 10, 4);
-  dirLight.castShadow = true;
-  scene.add(dirLight);
+scene.fog = new THREE.Fog(0x000000, 10, 60);
 
-  const pointLight = new THREE.PointLight(0xffffff, 0.8, 20);
-  pointLight.position.set(-4, 6, 4);
-  scene.add(pointLight);
+
+// Directional light (sun)
+const dirLight = new THREE.DirectionalLight(0xd98748, 1.5);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+
+// Better shadows
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 50;
+scene.add(dirLight);
 
   /*********** PLANE (GROUND) ***********/
-  const planeGeometry = new THREE.PlaneGeometry(20, 20);
+  const planeGeometry = new THREE.PlaneGeometry(100, 100);
   const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
   plane = new THREE.Mesh(planeGeometry, planeMaterial);
   plane.rotation.x = -Math.PI / 2;
   plane.position.y = 0;
   plane.receiveShadow = true;
+  plane.material.roughness = 5.0;
+  plane.material.metalness = 0.0;
+  
+
   scene.add(plane);
 
   setPlanetFloor("earth");
@@ -555,8 +583,12 @@ function createUI() {
  **********************************************************************/
 function updateCameraFromSpherical() {
   const pos = new THREE.Vector3().setFromSpherical(spherical);
-  camera.position.copy(pos).add(orbitTarget);
-  camera.lookAt(orbitTarget);
+camera.position.lerp(
+  new THREE.Vector3().setFromSpherical(spherical).add(orbitTarget),
+  1.5
+);
+camera.lookAt(orbitTarget);
+
 }
 
 function onMouseDown(event) {
