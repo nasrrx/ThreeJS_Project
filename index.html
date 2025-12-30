@@ -1,15 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab 7</title>
-    <script src="main.js" type="module"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Main Menu Boot</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; font-family: system-ui; }
+
+    /* Full-screen menu */
+    #menuOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none; /* boot.js decides */
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 20%, rgba(90,90,120,0.25), rgba(0,0,0,0.92));
+      color: #fff;
+    }
+
+    #menuCard {
+      width: min(420px, 92vw);
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+
+    #menuCard h1 {
+      margin: 0 0 10px 0;
+      font-size: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    #menuCard p {
+      margin: 0 0 14px 0;
+      opacity: 0.85;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .menuBtnRow { display: flex; gap: 10px; justify-content: center; }
+    .menuBtn {
+      cursor: pointer;
+      font-size: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      min-width: 140px;
+    }
+    .menuBtn:hover { background: rgba(255,255,255,0.14); }
+
+    /* Small Return button overlay */
+    #returnBtn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9998;
+      display: none; /* boot.js decides */
+      cursor: pointer;
+      font-size: 13px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      backdrop-filter: blur(6px);
+    }
+    #returnBtn:hover { background: rgba(0,0,0,0.7); }
+  </style>
 </head>
 
 <body>
+  <!-- Return button (appears after a mode is chosen) -->
+  <button id="returnBtn">← Return</button>
 
+  <!-- Main menu overlay -->
+  <div id="menuOverlay">
+    <div id="menuCard">
+      <h1>Main Menu</h1>
+      <p>
+        Choose a mode. Each mode runs from its own JS file and loads cleanly.
+      </p>
+
+      <div class="menuBtnRow">
+        <button class="menuBtn" id="btnPlayground">Playground</button>
+        <button class="menuBtn" id="btnFPS">FPS Shooter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boot loader -->
+  <script type="module" src="./boot.js"></script>
 </body>
-
 </html>
