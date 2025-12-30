@@ -48,7 +48,7 @@ if (!mode) {
   if (mode === "fps") {
     await import("./fps.js");
   } else if (mode === "waves") {
-    await import("./waves.js"); // <-- your Wave Lab entry file
+    await import("./waves.js"); 
   } else {
     // default: playground / main app
     await import("./main.js");
