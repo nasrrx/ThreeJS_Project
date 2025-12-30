@@ -171,7 +171,7 @@ dirLight.shadow.camera.far = 50;
 scene.add(dirLight);
 
   /*********** PLANE (GROUND) ***********/
-  const planeGeometry = new THREE.PlaneGeometry(100, 100);
+  const planeGeometry = new THREE.PlaneGeometry(80, 80);
   const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
   plane = new THREE.Mesh(planeGeometry, planeMaterial);
   plane.rotation.x = -Math.PI / 2;
@@ -202,7 +202,11 @@ scene.add(dirLight);
   bouncingSphere.position.set(0, 1.5, 1);
   bouncingSphere.castShadow = true;
   scene.add(bouncingSphere);
+   addCollisionBox(bouncingSphere);
   clickableObjects.push(bouncingSphere);
+
+  addCollisionBox(bouncingSphere);
+ 
 
   /*********** TORUS (SPINNING) ***********/
   const torusGeometry = new THREE.TorusGeometry(1, 0.25, 16, 100);
@@ -211,7 +215,10 @@ scene.add(dirLight);
   spinningTorus.position.set(3, 1.5, 0);
   spinningTorus.castShadow = true;
   scene.add(spinningTorus);
+   addCollisionBox(spinningTorus);
   clickableObjects.push(spinningTorus);
+
+  addCollisionBox(spinningTorus);
 
   /*********** CUBE (ROTATING) ***********/
   const cubeGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
@@ -220,7 +227,10 @@ scene.add(dirLight);
   rotatingCube.position.set(-3, 1, 0);
   rotatingCube.castShadow = true;
   scene.add(rotatingCube);
+   addCollisionBox(rotatingCube);
   clickableObjects.push(rotatingCube);
+
+  addCollisionBox(rotatingCube);
 
   /*********** WALL ***********/
   const wallGeometry = new THREE.BoxGeometry(0.3, 2.5, 8);
@@ -229,7 +239,10 @@ scene.add(dirLight);
   wall.position.set(0, 1.25, -4);
   wall.castShadow = true;
   scene.add(wall);
+   addCollisionBox(wall);
   clickableObjects.push(wall);
+
+  addCollisionBox(wall);
 
   /*********** CONE ***********/
   const coneGeometry = new THREE.ConeGeometry(0.7, 1.6, 32);
@@ -239,7 +252,19 @@ scene.add(dirLight);
   energyCone.castShadow = true;
   scene.add(energyCone);
   clickableObjects.push(energyCone);
+   addCollisionBox(energyCone);
   coneOriginalMaterial = energyCone.material;
+
+  addCollisionBox(energyCone);
+
+  /*********** COLLISION CACHING *******/
+  function addCollisionBox(object) {
+  object.userData.collider = new THREE.Box3().setFromObject(object);
+}
+
+function updateCollider(object) {
+  object.userData.collider.setFromObject(object);
+}
 
   /*********** AXES HELPER ***********/
   const axes = new THREE.AxesHelper(3);
@@ -276,43 +301,52 @@ function setPlanetFloor(planet) {
   if (!textureLoader || !plane) return;
 
   let fileName;
+  let repeat = new THREE.Vector2(1, 1); // default: no tiling
+  let wrap = THREE.ClampToEdgeWrapping;
+
   switch (planet) {
     case "earth":
       fileName = "EarthTexture.png";
+      repeat.set(4, 4);
+      wrap = THREE.RepeatWrapping;
       break;
+
     case "jupiter":
-      fileName = "JupiterTexture.jpg";
+      fileName = "Jupiter_4k.jpg";
+      repeat.set(4, 4);
+      wrap = THREE.RepeatWrapping;
       break;
+
     case "moon":
-      fileName = "MoonTexture.jpg";
+      fileName = "MoonText.jpg";
+      // IMPORTANT: no repeat, no tiling
+      repeat.set(1, 1);
+      wrap = THREE.ClampToEdgeWrapping;
       break;
+
     default:
       fileName = null;
   }
 
   if (!fileName) {
-    // Remove texture, fallback to plain color
     plane.material.map = null;
     plane.material.color.set(0x333333);
     plane.material.needsUpdate = true;
     return;
   }
 
-  textureLoader.load(
-    fileName,
-    function (tex) {
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(2, 2); // tile it a bit
-      plane.material.map = tex;
-      plane.material.color.set(0xffffff); // so texture shows correctly
-      plane.material.needsUpdate = true;
-    },
-    undefined,
-    function (err) {
-      console.error("Failed to load planet texture:", fileName, err);
-    }
-  );
+  textureLoader.load(fileName, (tex) => {
+    tex.encoding = THREE.sRGBEncoding;
+
+    tex.wrapS = tex.wrapT = wrap;
+    tex.repeat.copy(repeat);
+
+    plane.material.map = tex;
+    plane.material.color.set(0xffffff);
+    plane.material.needsUpdate = true;
+  });
 }
+
 
 
 /**********************************************************************
@@ -739,7 +773,7 @@ function onGravityPresetChange() {
   } else if (preset === "moon") {
     // You don't have a moon texture, pick one:
     // Option 1: use Mars as a placeholder
-    setPlanetFloor("mars");
+    setPlanetFloor("moon");
 
     // Option 2 (if you prefer plain floor):
     // setPlanetFloor(null);
@@ -929,57 +963,59 @@ function getApproxRadius(object) {
 function updateLastClickedMovement(delta) {
   if (!lastClickedObject) return;
 
-  // Build desired movement direction from WASD relative to camera
-  const dir = new THREE.Vector3();
+  const speed = moveSpeed * delta;
 
-  const camForward = new THREE.Vector3();
-  camera.getWorldDirection(camForward);
-  camForward.y = 0;
-  camForward.normalize();
+  // Camera-relative directions
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
 
-  const camRight = new THREE.Vector3().crossVectors(
-    camForward,
-    new THREE.Vector3(0, 1, 0)
-  ).normalize();
+  const right = new THREE.Vector3()
+    .crossVectors(forward, new THREE.Vector3(0, 1, 0))
+    .normalize();
 
-  if (moveInput.forward) dir.add(camForward);
-  if (moveInput.back) dir.sub(camForward);
-  if (moveInput.left) dir.sub(camRight);
-  if (moveInput.right) dir.add(camRight);
+  const moveDir = new THREE.Vector3();
+  if (moveInput.forward) moveDir.add(forward);
+  if (moveInput.back) moveDir.sub(forward);
+  if (moveInput.left) moveDir.sub(right);
+  if (moveInput.right) moveDir.add(right);
 
-  if (dir.lengthSq() === 0) return; // no input
+  if (moveDir.lengthSq() === 0) return;
+  moveDir.normalize();
 
-  dir.normalize();
-  const distance = moveSpeed * delta;
-  const displacement = dir.clone().multiplyScalar(distance);
+  const displacement = moveDir.multiplyScalar(speed);
 
-  // Candidate new position
-  const newPos = lastClickedObject.position.clone().add(displacement);
+  // --- AXIS SEPARATED MOVEMENT (KEY PART) ---
+  const axes = ["x", "z"];
 
-  // Approx radius of moving object
-  const myRadius = getApproxRadius(lastClickedObject) * 0.6; // scale a bit down
-  const margin = 0.15; // extra spacing so it feels solid but not too far
+  for (const axis of axes) {
+    lastClickedObject.position[axis] += displacement[axis];
+    updateCollider(lastClickedObject);
 
-  // Check distance to all other clickable objects
-  for (let i = 0; i < clickableObjects.length; i++) {
-    const other = clickableObjects[i];
-    if (other === lastClickedObject) continue;
+    let collided = false;
 
-    const otherRadius = getApproxRadius(other) * 0.6;
-    const minDist = myRadius + otherRadius + margin;
+    for (const other of clickableObjects) {
+      if (other === lastClickedObject) continue;
 
-    const otherPos = other.position.clone();
-    const dist = newPos.distanceTo(otherPos);
+      if (
+        lastClickedObject.userData.collider.intersectsBox(
+          other.userData.collider
+        )
+      ) {
+        collided = true;
+        break;
+      }
+    }
 
-    if (dist < minDist) {
-      // Too close to this object -> block movement this frame
-      return;
+    if (collided) {
+      // undo movement on this axis only
+      lastClickedObject.position[axis] -= displacement[axis];
+      updateCollider(lastClickedObject);
     }
   }
-
-  // No collisions -> move
-  lastClickedObject.position.copy(newPos);
 }
+
 
 /**********************************************************************
  * ANIMATION LOOP
@@ -1021,7 +1057,7 @@ function animate() {
 
     if (gravityState.object.position.y <= gravityState.floorY) {
       gravityState.object.position.y = gravityState.floorY;
-      gravityState.velocityY *= -0.5; // bounce with damping
+      gravityState.velocityY *= -0.35; // bounce with damping
 
       // finished?
       if (Math.abs(gravityState.velocityY) < 0.5) {
